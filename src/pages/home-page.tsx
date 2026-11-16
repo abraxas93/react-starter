@@ -18,7 +18,7 @@ export function HomePage() {
 					components, and light and dark themes already connected.
 				</p>
 				<Button asChild size="lg">
-					<Link to="/examples" search={{ q: "" }}>
+					<Link to="/examples">
 						Explore the example <ArrowRight aria-hidden="true" />
 					</Link>
 				</Button>

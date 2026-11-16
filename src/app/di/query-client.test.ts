@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NonRetryableError } from "@/api/error.ts";
-import { createAppQueryClient } from "./query-client.ts";
+import { NonRetryableError } from "@/api/error";
+import { createAppQueryClient } from "./query-client";
 
 afterEach(() => {
 	vi.restoreAllMocks();

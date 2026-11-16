@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ApiMethod } from "@/api/types.ts";
+import type { ApiMethod } from "@/api/types";
 
 export class NonRetryableError extends Error {}
 
