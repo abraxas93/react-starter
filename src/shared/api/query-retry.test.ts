@@ -32,10 +32,20 @@ describe("shouldRetryQuery", () => {
 		);
 	});
 
-	it("does not retry missing resources", () => {
-		const error = new ApiError(404, "Not Found", null, new Headers());
+	it("does not retry deterministic client errors", () => {
+		for (const status of [400, 401, 403, 404, 409, 422]) {
+			const error = new ApiError(status, "Client Error", null, new Headers());
 
-		expect(shouldRetryQuery(0, error)).toBe(false);
+			expect(shouldRetryQuery(0, error)).toBe(false);
+		}
+	});
+
+	it("retries timeouts, rate limits, and server errors", () => {
+		for (const status of [408, 429, 500, 503]) {
+			const error = new ApiError(status, "Transient", null, new Headers());
+
+			expect(shouldRetryQuery(0, error)).toBe(true);
+		}
 	});
 
 	it("preserves the default three retries for other failures", () => {

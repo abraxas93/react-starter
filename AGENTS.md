@@ -267,6 +267,10 @@ Deep imports into another module's internals are forbidden.
 Circular dependencies are forbidden.
 Lower layers must not import route modules or generated route-tree code.
 
+The single sanctioned upward import is `#/app/di/api-client` from feature `api/` modules (see `Dependency Injection and Wiring`).
+
+Biome enforces this direction and the public-API rule for `#/` alias imports through `noRestrictedImports` overrides in `biome.json`. When a layer or sanctioned exception changes, update those overrides in the same change. Do not bypass the rule with relative paths that leave the module or with suppression comments.
+
 When Feature A and Feature B must interact, prefer one of these patterns:
 
 1. A page/widget composes both through typed props/callbacks; routes pass validated data.
@@ -715,13 +719,13 @@ Use TanStack Router's file-based routing exclusively.
 
 ### Route Rules
 
-- Define routes with `createFileRoute`, except for the root route, which uses `createRootRoute`.
+- Define routes with `createFileRoute`, except for the root route, which uses `createRootRouteWithContext` and declares the router context (currently the shared `QueryClient`).
 - Each leaf user-facing route must render a page component from `src/pages`. Root and pathless layout routes may instead render the application or layout boundary they own.
 - Keep route modules thin. They may contain route configuration, loaders, `beforeLoad`, search-parameter validation, route-level error or pending components, and selection of the page component.
 - Use `validateSearch` to validate and normalize untrusted URL search parameters. Use `loaderDeps` when validated search values determine what a loader must load.
 - Use `beforeLoad` for route prerequisites such as authentication, authorization, redirects, and typed route-context extension. Do not use it as the ordinary data-fetching layer for a screen.
 - Use a route `loader` only when data is required before rendering or route-level preloading materially improves navigation. Loaders are not mandatory for every route.
-- When a loader coordinates TanStack Query, import the feature's query options through its public API and call the shared `QueryClient`; the page or feature component must consume the same query through TanStack Query rather than receiving a duplicated loader-owned server state.
+- When a loader coordinates TanStack Query, import the feature's query options through its public API and call the shared `QueryClient` from the route `context`; the page or feature component must consume the same query through TanStack Query rather than receiving a duplicated loader-owned server state.
 - Prefer this delegation: route → page → widget/feature. Leaf route modules must not import feature or widget internals, assemble screen UI, call raw API request functions, or own feature workflows.
 - Pass validated route data to pages through typed router APIs.
 - Move route-level screen composition into `pages`, reusable composed interface regions into `widgets`, and business workflows, feature state, and domain behavior into the owning `features`.

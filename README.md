@@ -43,7 +43,7 @@ src/
     lib/                # Class-name utility
 ```
 
-`#/*` resolves to `src/*`; `@/*` resolves to `src/shared/*`. External feature/widget consumers import their root `index.ts`. Concrete dependencies are constructed in `app/di`; feature API adapters may use its configured HTTP client. Shared transport never imports app or feature code. See [AGENTS.md](./AGENTS.md) for the full engineering rules; `CLAUDE.md` points to that same source.
+`#/*` resolves to `src/*`; `@/*` resolves to `src/shared/*`. External feature/widget consumers import their root `index.ts`. Concrete dependencies are constructed in `app/di`; feature API adapters may use its configured HTTP client. Shared transport never imports app or feature code. Biome enforces the layer direction and public-API imports for `#/` aliases through `noRestrictedImports` in `biome.json`; extend its overrides when you add a layer or exception. See [AGENTS.md](./AGENTS.md) for the full engineering rules; `CLAUDE.md` points to that same source.
 
 `src/routeTree.gen.ts` is generated. Run `pnpm generate-routes` after changing route files; development, builds, and the typecheck command also generate it.
 
@@ -62,14 +62,18 @@ Copy `.env.example` to `.env.local` if you need configuration. All `VITE_*` valu
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `VITE_ENABLE_MOCK` | `true` | Use data attached through `.response(schema).mock(payload)` |
-| `VITE_API_URL` | `https://example.invalid` | Base URL used when mocks are disabled |
+| `VITE_ENABLE_MOCK` | `true` in development, `false` in production builds | Use data attached through `.response(schema).mock(payload)` |
+| `VITE_API_URL` | none | API base URL. Required whenever mocks are disabled |
+
+A production build never enables mocks implicitly. If it has neither `VITE_API_URL` nor an explicit `VITE_ENABLE_MOCK=true`, the application fails at startup with a validation error instead of serving demo data.
 
 `/examples/catalog` and its DTO are an illustrative contract, **not an implemented backend**. Replace the path, schema, and mock with your real API contract before setting `VITE_ENABLE_MOCK=false`. With mocks enabled the example makes no network requests. With mocks disabled, failures are shown in the example's retry UI; there is no fallback to fake success data.
 
 Mocks live beside their schemas in `api/dto/*.mock.ts`, are typed as `z.input<typeof schema>`, and pass through the same Zod validation as live responses. The mock flag is injected at the app composition boundary; the shared request builder has no environment dependency. Empty mocked responses are supported.
 
-The HTTP client does not assume cookie authentication, token refresh endpoints, or a login flow. Add authentication behavior centrally after choosing your real backend contract. HTTP errors retain status and headers; response-validation errors are non-retryable.
+The HTTP client does not assume cookie authentication, token refresh endpoints, or a login flow. Add authentication behavior centrally after choosing your real backend contract. HTTP errors retain status and headers. Queries do not retry response-validation errors or 4xx responses other than 408 and 429.
+
+The router context carries the shared `QueryClient`. A route loader can warm a query through `context.queryClient` with query options exported from the feature, as `/examples` does.
 
 ## Commands
 
@@ -87,8 +91,8 @@ Run `pnpm exec biome check --write src vite.config.ts index.html` to apply sourc
 ## Optional container
 
 ```sh
-docker build -t react-template .
+docker build --build-arg VITE_ENABLE_MOCK=true -t react-template .
 docker run --rm -p 8080:80 react-template
 ```
 
-nginx serves `dist/` and falls back to `index.html` for client routes. Once a real API is implemented, pass `--build-arg VITE_API_URL=https://your-api.example --build-arg VITE_ENABLE_MOCK=false` during the build. Changing container runtime variables does not change the compiled Vite configuration.
+nginx serves `dist/` and falls back to `index.html` for client routes. The command above opts in to the demo data. Once a real API is implemented, build with `--build-arg VITE_API_URL=https://your-api.example` instead; an image built with neither argument fails at startup. Changing container runtime variables does not change the compiled Vite configuration.

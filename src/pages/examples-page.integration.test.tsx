@@ -25,9 +25,10 @@ async function renderPage(path: string) {
 		defaultOptions: { queries: { retry: false } },
 	});
 	clients.push(client);
-	const router = createAppRouter(
-		createMemoryHistory({ initialEntries: [path] }),
-	);
+	const router = createAppRouter({
+		queryClient: client,
+		history: createMemoryHistory({ initialEntries: [path] }),
+	});
 	await router.load();
 	render(
 		<QueryClientProvider client={client}>

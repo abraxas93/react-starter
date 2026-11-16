@@ -30,12 +30,237 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"style": {
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"patterns": [
+							{
+								"group": [
+									"#/features/*/**",
+									"#/widgets/*/**",
+									"#/entities/*/**"
+								],
+								"message": "Import this module through its root index.ts public API, not its internals."
+							}
+						]
+					}
+				}
+			}
 		}
 	},
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["**/src/shared/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#/app/**",
+											"#/routes/**",
+											"#/pages/**",
+											"#/widgets/**",
+											"#/features/**",
+											"#/entities/**",
+											"#/routeTree.gen*"
+										],
+										"message": "shared must stay domain-neutral and must not import higher layers."
+									},
+									{
+										"group": [
+											"#/features/*/**",
+											"#/widgets/*/**",
+											"#/entities/*/**"
+										],
+										"message": "Import this module through its root index.ts public API, not its internals."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/src/entities/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#/app/**",
+											"#/routes/**",
+											"#/pages/**",
+											"#/widgets/**",
+											"#/features/**",
+											"#/entities/**",
+											"#/routeTree.gen*"
+										],
+										"message": "entities may import only from shared."
+									},
+									{
+										"group": [
+											"#/features/*/**",
+											"#/widgets/*/**",
+											"#/entities/*/**"
+										],
+										"message": "Import this module through its root index.ts public API, not its internals."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/src/features/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#/app/**",
+											"#/routes/**",
+											"#/pages/**",
+											"#/widgets/**",
+											"!#/app/di/api-client",
+											"#/routeTree.gen*"
+										],
+										"message": "features may import only entities, shared, and the configured HTTP client (#/app/di/api-client)."
+									},
+									{
+										"group": [
+											"#/features/*/**",
+											"#/widgets/*/**",
+											"#/entities/*/**"
+										],
+										"message": "Import this module through its root index.ts public API, not its internals."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/src/widgets/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"#/app/**",
+											"#/routes/**",
+											"#/pages/**",
+											"#/routeTree.gen*"
+										],
+										"message": "widgets may import only features, entities, and shared."
+									},
+									{
+										"group": [
+											"#/features/*/**",
+											"#/widgets/*/**",
+											"#/entities/*/**"
+										],
+										"message": "Import this module through its root index.ts public API, not its internals."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/src/pages/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["#/app/**", "#/routes/**", "#/routeTree.gen*"],
+										"message": "pages may import only widgets, features, entities, and shared."
+									},
+									{
+										"group": [
+											"#/features/*/**",
+											"#/widgets/*/**",
+											"#/entities/*/**"
+										],
+										"message": "Import this module through its root index.ts public API, not its internals."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/src/routes/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["#/app/**"],
+										"message": "routes must not import the app composition layer; use router context instead."
+									},
+									{
+										"group": [
+											"#/features/*/**",
+											"#/widgets/*/**",
+											"#/entities/*/**"
+										],
+										"message": "Import this module through its root index.ts public API, not its internals."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/*.test.ts", "**/*.test.tsx"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": "off"
+					}
+				}
+			}
+		}
+	]
 }
