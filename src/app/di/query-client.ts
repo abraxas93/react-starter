@@ -1,5 +1,5 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-import { shouldRetryQuery } from "@/api/query-retry.ts";
+import { shouldRetryQuery } from "@/api/query-retry";
 
 export function createAppQueryClient(): QueryClient {
 	return new QueryClient({

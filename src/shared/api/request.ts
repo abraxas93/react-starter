@@ -1,51 +1,45 @@
-import type { ZodType, z } from "zod";
-import { ApiResponseValidationError } from "@/api/error.ts";
+import type { ZodType } from "zod";
+import { ApiResponseValidationError } from "@/api/error";
 import type {
 	ApiMethod,
+	ApiQuery,
 	ApiRequestBody,
-	ApiRequestFetch,
-} from "@/api/types.ts";
+	ApiTransport,
+} from "@/api/types";
 
-export class ApiRequest<ResponseOutput = unknown, ResponseInput = never>
-	implements PromiseLike<ResponseOutput>
-{
-	readonly #fetch: ApiRequestFetch;
-
+/** Builds a request. Call `.response(schema)` to make it sendable. */
+export class ApiRequest {
+	readonly #transport: ApiTransport;
+	readonly #mockEnabled: boolean;
+	readonly #headers = new Headers();
 	#body?: ApiRequestBody;
-
-	#responseType!: ZodType;
-
-	#mockData?: ResponseInput;
-
 	#signal?: AbortSignal;
-
-	#hasMock = false;
 
 	constructor(
 		public readonly method: ApiMethod,
 		public readonly url: URL,
-		fetch: ApiRequestFetch,
-		private readonly mockEnabled = false,
+		transport: ApiTransport,
+		mockEnabled = false,
 	) {
-		this.#fetch = fetch;
+		this.#transport = transport;
+		this.#mockEnabled = mockEnabled;
 	}
 
-	query(data: Record<string, string | number | (string | number)[]>): this {
-		Object.entries(data || {}).forEach(([key, value]) => {
-			if (value === undefined) {
-				return;
+	query(data: ApiQuery): this {
+		for (const [key, value] of Object.entries(data)) {
+			if (value === undefined) continue;
+			this.url.searchParams.delete(key);
+			for (const item of Array.isArray(value) ? value : [value]) {
+				this.url.searchParams.append(key, String(item));
 			}
+		}
+		return this;
+	}
 
-			if (Array.isArray(value)) {
-				this.url?.searchParams.delete(key);
-				value.forEach((item) => {
-					this.url?.searchParams.append(key, String(item));
-				});
-				return;
-			}
-
-			this.url?.searchParams.set(key, String(value));
-		});
+	headers(headers: Record<string, string>): this {
+		for (const [name, value] of Object.entries(headers)) {
+			this.#headers.set(name, value);
+		}
 		return this;
 	}
 
@@ -54,98 +48,78 @@ export class ApiRequest<ResponseOutput = unknown, ResponseInput = never>
 		return this;
 	}
 
-	response<Schema extends ZodType>(
-		schema: Schema,
-	): ApiRequest<z.output<Schema>, z.input<Schema>> {
-		this.#responseType = schema;
-		return this as ApiRequest<z.output<Schema>, z.input<Schema>>;
-	}
-
-	mock(data: ResponseInput): this {
-		this.#hasMock = true;
-		this.#mockData = data;
-		return this;
-	}
-
 	signal(signal: AbortSignal | undefined): this {
 		this.#signal = signal;
 		return this;
 	}
 
-	// biome-ignore lint/suspicious/noThenProperty: This is promise like ApiRequest
-	then<TResult1 = ResponseOutput, TResult2 = never>(
-		resolve?:
-			| ((value: ResponseOutput) => PromiseLike<TResult1> | TResult1)
-			| undefined
-			| null,
-		reject?:
-			| ((reason: unknown) => PromiseLike<TResult2> | TResult2)
-			| undefined
-			| null,
-	): PromiseLike<TResult1 | TResult2> {
-		if (!this.#responseType) {
-			throw new Error(
-				`[${this.method}] (${this.url.pathname}): Response type is not defined. Use .response(ZodType)`,
-			);
-		}
+	response<Output, Input>(
+		schema: ZodType<Output, Input>,
+	): ValidatedApiRequest<Output, Input> {
+		return new ValidatedApiRequest(
+			this.method,
+			this.url.pathname,
+			schema,
+			() => this.#transport(this.#toRequest()),
+			this.#mockEnabled,
+		);
+	}
 
-		const resolveData = (data: unknown) => {
-			if (!resolve) {
-				return data as TResult1;
-			}
-
-			return resolve(data as ResponseOutput);
-		};
-
-		const rejectData = (data: unknown) => {
-			if (!reject) {
-				throw data;
-			}
-
-			return reject(data);
-		};
-
-		const headers: Record<string, string> = {};
-
+	#toRequest(): Request {
+		const headers = new Headers(this.#headers);
 		let body: FormData | string | undefined;
-
-		if (this.#body) {
-			if (this.#body instanceof FormData) {
-				body = this.#body;
-			} else {
-				body = JSON.stringify(this.#body);
-				headers["Content-Type"] = "application/json";
-			}
+		if (this.#body instanceof FormData) {
+			body = this.#body;
+		} else if (this.#body !== undefined) {
+			body = JSON.stringify(this.#body);
+			headers.set("Content-Type", "application/json");
 		}
-
-		const request = new Request(this.url, {
+		return new Request(this.url, {
 			method: this.method,
 			headers,
 			body,
 			signal: this.#signal,
 		});
+	}
+}
 
-		return (
-			this.#hasMock && this.mockEnabled
-				? Promise.resolve(this.#mockData)
-				: this.#fetch(request)
-		)
-			.then(async (responseData) => {
-				const result = await this.#responseType.safeParseAsync(responseData);
+/** A request with a response contract. Nothing is sent until `.send()`. */
+export class ValidatedApiRequest<Output, Input> {
+	readonly #schema: ZodType<Output, Input>;
+	readonly #execute: () => Promise<unknown>;
+	readonly #mockEnabled: boolean;
+	#mock?: { data: Input };
 
-				if (result.success) {
-					return result.data;
-				}
+	constructor(
+		public readonly method: ApiMethod,
+		public readonly path: string,
+		schema: ZodType<Output, Input>,
+		execute: () => Promise<unknown>,
+		mockEnabled: boolean,
+	) {
+		this.#schema = schema;
+		this.#execute = execute;
+		this.#mockEnabled = mockEnabled;
+	}
 
-				const error = new ApiResponseValidationError(
-					this.method,
-					this.url.pathname,
-					result.error,
-				);
+	/** Raw backend payload used instead of the network when mocks are enabled. */
+	mock(data: Input): this {
+		this.#mock = { data };
+		return this;
+	}
 
-				throw error;
-			})
-			.then(resolveData)
-			.catch(rejectData);
+	/** Sends the request (one network call per invocation) and validates the response. */
+	async send(): Promise<Output> {
+		const data =
+			this.#mock && this.#mockEnabled ? this.#mock.data : await this.#execute();
+		const result = await this.#schema.safeParseAsync(data);
+		if (!result.success) {
+			throw new ApiResponseValidationError(
+				this.method,
+				this.path,
+				result.error,
+			);
+		}
+		return result.data;
 	}
 }

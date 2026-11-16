@@ -26,11 +26,14 @@ export const Route = createRootRouteWithContext<{
 			</Button>
 		</section>
 	),
+	// A root error replaces the root component, so the shell is rendered here too.
 	errorComponent: ({ reset }) => (
-		<section className="space-y-4" role="alert">
-			<h1 className="text-3xl font-semibold">Something went wrong</h1>
-			<p className="text-muted-foreground">Try opening this page again.</p>
-			<Button onClick={reset}>Try again</Button>
-		</section>
+		<ApplicationShell>
+			<section className="space-y-4" role="alert">
+				<h1 className="text-3xl font-semibold">Something went wrong</h1>
+				<p className="text-muted-foreground">Try opening this page again.</p>
+				<Button onClick={reset}>Try again</Button>
+			</section>
+		</ApplicationShell>
 	),
 });

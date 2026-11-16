@@ -1,8 +1,6 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { ApiRequest } from "@/api/request.ts";
+import { ApiRequest } from "@/api/request";
 
 describe("ApiRequest response validation", () => {
 	it("throws a contextual validation error", async () => {
@@ -16,9 +14,7 @@ describe("ApiRequest response validation", () => {
 			}),
 		);
 
-		const result = Promise.resolve(request);
-
-		await expect(result).rejects.toMatchObject({
+		await expect(request.send()).rejects.toMatchObject({
 			name: "ApiResponseValidationError",
 			method: "GET",
 			path: "/v1/items",
@@ -33,7 +29,7 @@ describe("ApiRequest response validation", () => {
 	it("passes an abort signal to the request", async () => {
 		const abortController = new AbortController();
 		let receivedRequest: Request | undefined;
-		const request = new ApiRequest(
+		await new ApiRequest(
 			"GET",
 			new URL("https://api.example.com/v1/items"),
 			async (input) => {
@@ -42,12 +38,28 @@ describe("ApiRequest response validation", () => {
 			},
 		)
 			.signal(abortController.signal)
-			.response(z.object({ data: z.array(z.string()) }));
-
-		await Promise.resolve(request);
+			.response(z.object({ data: z.array(z.string()) }))
+			.send();
 
 		expect(receivedRequest?.signal.aborted).toBe(false);
 		abortController.abort();
 		expect(receivedRequest?.signal.aborted).toBe(true);
+	});
+
+	it("sends nothing until send() and once per call", async () => {
+		let calls = 0;
+		const request = new ApiRequest(
+			"GET",
+			new URL("https://api.example.com/v1/items"),
+			async () => {
+				calls += 1;
+				return "ok";
+			},
+		).response(z.string());
+
+		expect(calls).toBe(0);
+		await request.send();
+		await request.send();
+		expect(calls).toBe(2);
 	});
 });

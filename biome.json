@@ -12,6 +12,12 @@
 			"**/.vscode/**/*",
 			"**/index.html",
 			"**/vite.config.ts",
+			"**/vitest.setup.ts",
+			"**/package.json",
+			"**/tsconfig*.json",
+			"**/components.json",
+			"**/tsr.config.json",
+			"**/biome.json",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/styles.css"
 		]
@@ -56,6 +62,22 @@
 		}
 	},
 	"overrides": [
+		{
+			"includes": [
+				"**/package.json",
+				"**/tsconfig*.json",
+				"**/components.json",
+				"**/tsr.config.json"
+			],
+			"formatter": {
+				"indentStyle": "space"
+			},
+			"json": {
+				"parser": {
+					"allowComments": true
+				}
+			}
+		},
 		{
 			"includes": ["**/src/shared/**"],
 			"linter": {

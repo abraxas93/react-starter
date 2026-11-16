@@ -196,10 +196,10 @@ features/
     │   │   └── invite-user.dto.ts
     │   └── invite-user.api.ts
     ├── components/
-    │   ├── InviteUserForm.tsx
-    │   └── InviteUserDialog.tsx
+    │   ├── invite-user-form.tsx
+    │   └── invite-user-dialog.tsx
     ├── hooks/
-    │   └── useInviteUser.ts
+    │   └── use-invite-user.ts
     ├── mappers/
     │   └── map-invitation.ts
     ├── models/
@@ -214,6 +214,8 @@ features/
     ├── __tests__/
     └── index.ts
 ```
+
+Name files and folders in kebab-case (`invite-user-form.tsx`, `use-invite-user.ts`), including component and hook files; exported components stay PascalCase and hooks stay `useCamelCase`. Import shared code through `@/…` and everything else under `src` through `#/…`, without file extensions.
 
 Do not add both `utils/` and `lib/` to the same feature without a clear, enforced distinction. Avoid catch-all files such as `helpers.ts`, `types.ts`, or `utils.ts` when more specific names are possible.
 
@@ -307,7 +309,7 @@ Client stores must expose semantic actions and selectors rather than leaking mut
 
 ### Page controllers and page-scoped state
 
-A non-trivial page may define a page controller hook, such as `useMcpServerRegistryPage`, as the central catalog of its screen-level orchestration and available actions.
+A non-trivial page may define a page controller hook, such as `useExamplesPage`, as the central catalog of its screen-level orchestration and available actions.
 
 - A page controller may compose typed route data, TanStack Router navigation, TanStack Query or feature hooks, browser capabilities, and transient page UI state into a semantic page API.
 - A page controller adapts existing owners; it must not copy route params or search values, Query data, Query status, or mutation status into another state container.
@@ -320,6 +322,8 @@ A non-trivial page may define a page controller hook, such as `useMcpServerRegis
 - If state must survive between sibling pages or nested routes, place its provider at the owning route layout or feature boundary and classify it as feature-scoped rather than pretending it is local to one page.
 
 ### Zustand stores
+
+No client-store library is installed. Add Zustand only when the rules above call for a page-scoped or feature-scoped store; until then this section describes how such a store must behave.
 
 - Use page-scoped or feature-scoped Zustand stores only for complex client-owned state shared by multiple components.
 - Create a page-scoped store per mounted page scope through a store factory and provider; do not expose it as a module-global singleton.
@@ -357,7 +361,7 @@ Example — feature:
 
 ```ts
 // features/user-invitation/index.ts
-export { InviteUserDialog } from "./components/InviteUserDialog";
+export { InviteUserDialog } from "./components/invite-user-dialog";
 export type { InvitationResult } from "./models/invitation";
 ```
 
@@ -384,7 +388,7 @@ Do not deep-import private internals:
 
 ```ts
 // Forbidden outside the feature
-import { InviteUserForm } from "@/features/user-invitation/components/InviteUserForm";
+import { InviteUserForm } from "@/features/user-invitation/components/invite-user-form";
 
 // Forbidden outside the entity
 import { getUserDisplayName } from "@/entities/user/lib/get-user-display-name";
@@ -408,7 +412,7 @@ Construct concrete infrastructure in one application composition area, normally 
 
 This includes HTTP clients, repositories, storage, analytics, logging, clocks, ID generators, query clients, and feature services. Do not instantiate these throughout components.
 
-The configured application HTTP client is an infrastructure adapter and may be imported directly by feature API modules. Feature API request functions must not accept that client as a routine parameter merely to enable tests. Keep client construction and configuration centralized, and test API modules at the transport boundary. Inject a client only when the application genuinely needs multiple interchangeable clients or runtime-specific transport behavior; document that exception at the owning composition boundary.
+The configured application HTTP client is an infrastructure adapter and may be imported directly by feature API modules. Cross-cutting transport behavior (authentication headers, credentials mode, timeouts) is configured once on that client in `src/app/di/api-client.ts`, never per feature. Feature API request functions must not accept that client as a routine parameter merely to enable tests. Keep client construction and configuration centralized, and test API modules at the transport boundary. Inject a client only when the application genuinely needs multiple interchangeable clients or runtime-specific transport behavior; document that exception at the owning composition boundary.
 
 Prefer plain TypeScript contracts and factories over a DI framework. Define a dependency interface near its consumer:
 
@@ -513,7 +517,7 @@ An API adapter:
 - serializes requests;
 - is implemented as a named request function in the owning feature's `api/` folder;
 - uses the configured application HTTP client directly by default rather than accepting it as a parameter;
-- handles every successful response through `.response(...)` with a Zod schema, including empty or intentionally ignored responses;
+- handles every successful response through `.response(...)` with a Zod schema, including empty or intentionally ignored responses, and sends it with the explicit terminal `.send()`;
 - relies on the centralized HTTP client to normalize generic HTTP, authentication, and rate-limit failures;
 - maps only known endpoint-specific failure semantics into feature-understood errors;
 - does not catch transport or response-validation errors to return fallback success values;
@@ -557,7 +561,7 @@ Runtime backend-response mocks must be defined at the owning feature's API bound
 
 Keep each mock value in a separate `api/dto/<name>.mock.ts` file next to the corresponding `<name>.dto.ts` schema. Type raw mock values with `satisfies z.input<typeof responseSchema>` so they represent the backend payload before Zod parsing and transformation.
 
-Apply `.response(responseSchema)` before `.mock(responseMock)`. Mock responses must pass through the same response schema, transformations, mappers, and application flow as real responses.
+Apply `.response(responseSchema)` before `.mock(responseMock)`, then call `.send()`. A mock that depends on the request, such as an echoed create response, is a function in the same `*.mock.ts` file. Mock responses must pass through the same response schema, transformations, mappers, and application flow as real responses.
 
 This rule applies only to runtime backend-response mocks. It does not replace test doubles such as `vi.mock()`, rejected or pending request simulations, browser API mocks, service fakes, or domain and UI fixtures.
 
@@ -729,8 +733,7 @@ Use TanStack Router's file-based routing exclusively.
 - Prefer this delegation: route → page → widget/feature. Leaf route modules must not import feature or widget internals, assemble screen UI, call raw API request functions, or own feature workflows.
 - Pass validated route data to pages through typed router APIs.
 - Move route-level screen composition into `pages`, reusable composed interface regions into `widgets`, and business workflows, feature state, and domain behavior into the owning `features`.
-- Use `_app` as the pathless layout for the authenticated application shell. Authenticated routes belong beneath this layout.
-- Keep unauthenticated routes, such as sign-in or password recovery, outside `_app`.
+- The template has no authentication. When it is added, use `_app` as the pathless layout for the authenticated application shell, place authenticated routes beneath it, and keep unauthenticated routes, such as sign-in or password recovery, outside `_app`.
 - Use pathless layout routes when children must share layout, context, or guards without adding a URL segment.
 - Use route group directories such as `(group)` only for organization; they must not be treated as layouts or authorization boundaries.
 - Use TanStack Router APIs for navigation and links. Do not add or mix in another routing library.
@@ -968,7 +971,7 @@ Use the repository's non-interactive test command in automated runs. If the `tes
 - Do not create tests that merely repeat the fields declared by a straightforward DTO schema. Add focused DTO tests only for observable parsing behavior such as preprocessing, coercion, transformation, normalization, refinements, discriminated unions, or subtle optional/nullable rules. Colocate those tests with the schema in `api/dto/`.
 - Test pure domain rules, mappers, reducers, and validation without rendering React.
 - Test services with injected fake dependencies.
-- Test components through user-visible behavior and accessible roles and names.
+- Test components through user-visible behavior and accessible roles and names. Tests run in jsdom with `vitest.setup.ts`, which registers the `@testing-library/jest-dom` matchers and unmounts after each test; drive interaction with `@testing-library/user-event`.
 - Use integration tests when confidence depends on routing, providers, forms, queries, or cache invalidation working together.
 - Do not assert private implementation details when observable behavior is the actual contract.
 - Do not update snapshots blindly.

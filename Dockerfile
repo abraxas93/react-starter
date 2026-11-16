@@ -10,8 +10,8 @@ ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_ENABLE_MOCK=$VITE_ENABLE_MOCK
 RUN pnpm build
 
-FROM nginx:alpine AS runtime
+# Runs as the unprivileged nginx user and therefore listens on 8080, not 80.
+FROM nginxinc/nginx-unprivileged:alpine AS runtime
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8080

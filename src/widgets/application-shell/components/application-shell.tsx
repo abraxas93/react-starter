@@ -29,11 +29,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
 							</Link>
 						</Button>
 						<Button asChild variant="ghost">
-							<Link
-								to="/examples"
-								search={{ q: "" }}
-								activeProps={{ className: "bg-accent" }}
-							>
+							<Link to="/examples" activeProps={{ className: "bg-accent" }}>
 								Example
 							</Link>
 						</Button>

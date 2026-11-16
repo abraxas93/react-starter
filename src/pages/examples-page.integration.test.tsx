@@ -1,20 +1,13 @@
-// @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppRouter } from "#/app/di/router";
 
 const clients: QueryClient[] = [];
 beforeEach(() => vi.stubGlobal("scrollTo", vi.fn()));
 afterEach(() => {
-	cleanup();
 	vi.unstubAllGlobals();
 	for (const client of clients) client.clear();
 	clients.length = 0;
@@ -83,5 +76,27 @@ describe("starter navigation", () => {
 				name: "Your next project starts here.",
 			}),
 		).toBeTruthy();
+	});
+	it("keeps the default search out of the URL", async () => {
+		const router = await renderPage("/examples");
+		await screen.findByRole("heading", { name: "Example catalog" });
+		expect(router.state.location.href).toBe("/examples");
+	});
+	it("validates the form and adds the created example to the list", async () => {
+		const user = userEvent.setup();
+		await renderPage("/examples");
+		await screen.findByRole("heading", { name: "File-based routing" });
+		await user.click(screen.getByRole("button", { name: "Add example" }));
+		expect(
+			screen.getByRole("textbox", { name: "Title" }),
+		).toHaveAccessibleDescription("Enter a title.");
+		await user.type(screen.getByRole("textbox", { name: "Title" }), "Forms");
+		await user.type(
+			screen.getByRole("textbox", { name: "Description" }),
+			"A validated form backed by a mutation.",
+		);
+		await user.click(screen.getByRole("button", { name: "Add example" }));
+		expect(await screen.findByRole("heading", { name: "Forms" })).toBeVisible();
+		expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("");
 	});
 });

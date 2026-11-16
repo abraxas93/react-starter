@@ -4,8 +4,8 @@ import {
 	ApiError,
 	ApiResponseValidationError,
 	NonRetryableError,
-} from "@/api/error.ts";
-import { shouldRetryQuery } from "@/api/query-retry.ts";
+} from "@/api/error";
+import { shouldRetryQuery } from "@/api/query-retry";
 
 describe("shouldRetryQuery", () => {
 	it("does not retry response validation failures", () => {

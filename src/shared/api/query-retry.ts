@@ -1,4 +1,4 @@
-import { ApiError, NonRetryableError } from "@/api/error.ts";
+import { ApiError, NonRetryableError } from "@/api/error";
 
 const DEFAULT_QUERY_RETRY_COUNT = 3;
 const REQUEST_TIMEOUT = 408;

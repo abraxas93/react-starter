@@ -18,12 +18,12 @@ Use Node 24 and pnpm 10.23.0 (pinned in `package.json`). Open http://localhost:5
 ## What is included
 
 - `/`: a welcome screen and shared application shell.
-- `/examples`: a small searchable catalog. Search is validated and stored in the URL; data is owned by TanStack Query.
+- `/examples`: a small searchable catalog with a validated form. Search is validated and stored in the URL; data is owned by TanStack Query, and the form submits through a mutation that updates the query cache.
 - Light, dark, and system themes, with semantic Tailwind tokens.
-- A configured HTTP client with Zod response validation, abort signals, API-boundary mocks, and normalized HTTP errors.
+- A configured HTTP client with Zod response validation, abort signals, timeouts, default headers and credentials, API-boundary mocks, and normalized HTTP errors.
 - Loading, empty, error, retry, refresh, and stale-data states.
-- Tests for routing, filtering, query behavior, and transport behavior.
-- One GitHub Actions quality workflow and optional Docker/nginx hosting.
+- Tests for routing, filtering, form validation, query and mutation behavior, and transport behavior.
+- One GitHub Actions quality workflow, Dependabot updates, and optional Docker/nginx hosting.
 
 There is deliberately no authentication provider, deployment account, global client store, or rich-text editor. Add these when your product requires them. The four retained UI primitives are Button, Card, Input, and Label. Add more with `pnpm exec shadcn add <component>`.
 
@@ -54,7 +54,7 @@ src/
 3. Replace the example route/page/feature and update the shell navigation and home link. Remove `examples-page.search.ts` and its tests along with the example.
 4. Introduce entities, services, or client stores only when there is a real shared concept or workflow requiring them.
 
-Keep ephemeral UI state local, shareable navigation in the router, and server state in TanStack Query. The example intentionally has no fake writes or persistence.
+Keep ephemeral UI state local, shareable navigation in the router, and server state in TanStack Query. The example has no persistence: with mocks enabled, the create request echoes its input and the new item lives in the query cache until the list is refreshed.
 
 ## Connect an API
 
@@ -62,7 +62,7 @@ Copy `.env.example` to `.env.local` if you need configuration. All `VITE_*` valu
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `VITE_ENABLE_MOCK` | `true` in development, `false` in production builds | Use data attached through `.response(schema).mock(payload)` |
+| `VITE_ENABLE_MOCK` | `true` in development, `false` in production builds | Use data attached through `.response(schema).mock(payload).send()` |
 | `VITE_API_URL` | none | API base URL. Required whenever mocks are disabled |
 
 A production build never enables mocks implicitly. If it has neither `VITE_API_URL` nor an explicit `VITE_ENABLE_MOCK=true`, the application fails at startup with a validation error instead of serving demo data.
@@ -71,7 +71,9 @@ A production build never enables mocks implicitly. If it has neither `VITE_API_U
 
 Mocks live beside their schemas in `api/dto/*.mock.ts`, are typed as `z.input<typeof schema>`, and pass through the same Zod validation as live responses. The mock flag is injected at the app composition boundary; the shared request builder has no environment dependency. Empty mocked responses are supported.
 
-The HTTP client does not assume cookie authentication, token refresh endpoints, or a login flow. Add authentication behavior centrally after choosing your real backend contract. HTTP errors retain status and headers. Queries do not retry response-validation errors or 4xx responses other than 408 and 429.
+A request is built with `.query()`, `.headers()`, `.body()`, and `.signal()`, given a contract with `.response(schema)`, and sent with `.send()`; nothing reaches the network before `.send()`.
+
+The HTTP client does not assume cookie authentication, token refresh endpoints, or a login flow. Add authentication centrally in `src/app/di/api-client.ts` after choosing your real backend contract: `credentials: "include"` for cookies, or `headers: () => ({ Authorization: … })` for tokens. The same file sets the 30-second request timeout. HTTP errors retain status and headers. Queries do not retry response-validation errors or 4xx responses other than 408 and 429.
 
 The router context carries the shared `QueryClient`. A route loader can warm a query through `context.queryClient` with query options exported from the feature, as `/examples` does.
 
@@ -79,20 +81,21 @@ The router context carries the shared `QueryClient`. A route loader can warm a q
 
 ```sh
 pnpm check          # Biome formatting, imports, and lint checks
+pnpm check:fix      # Apply formatting and safe lint fixes
 pnpm lint           # Lint only
-pnpm typecheck      # Generate routes, then TypeScript
+pnpm typecheck      # Generate routes, then TypeScript (app and Node configs)
 pnpm test           # Run tests once
 pnpm build          # Production bundle in dist/
 pnpm preview        # Serve the production bundle locally
 ```
 
-Run `pnpm exec biome check --write src vite.config.ts index.html` to apply source formatting and safe lint fixes. GitHub Actions runs check, typecheck, tests, and build with the frozen lockfile. No deployments or external credentials are configured.
+Tests run in jsdom; `vitest.setup.ts` registers the jest-dom matchers and unmounts after each test. GitHub Actions runs check, typecheck, tests, and build with the frozen lockfile. No deployments or external credentials are configured.
 
 ## Optional container
 
 ```sh
 docker build --build-arg VITE_ENABLE_MOCK=true -t react-template .
-docker run --rm -p 8080:80 react-template
+docker run --rm -p 8080:8080 react-template
 ```
 
-nginx serves `dist/` and falls back to `index.html` for client routes. The command above opts in to the demo data. Once a real API is implemented, build with `--build-arg VITE_API_URL=https://your-api.example` instead; an image built with neither argument fails at startup. Changing container runtime variables does not change the compiled Vite configuration.
+nginx runs as an unprivileged user on port 8080, serves `dist/` with gzip and basic security headers, and falls back to `index.html` for client routes. The command above opts in to the demo data. Once a real API is implemented, build with `--build-arg VITE_API_URL=https://your-api.example` instead; an image built with neither argument fails at startup. Changing container runtime variables does not change the compiled Vite configuration. No Content-Security-Policy is set; add one that matches your API origin and assets before going to production.

@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getCatalog } from "../api/get-catalog.api";
 import { ExampleCatalog } from "./example-catalog";
@@ -8,7 +8,6 @@ import { ExampleCatalog } from "./example-catalog";
 vi.mock("../api/get-catalog.api", () => ({ getCatalog: vi.fn() }));
 const clients: QueryClient[] = [];
 afterEach(() => {
-	cleanup();
 	for (const client of clients) client.clear();
 	clients.length = 0;
 	vi.resetAllMocks();
@@ -32,20 +31,20 @@ describe("catalog query states", () => {
 	it("announces a pending request", () => {
 		vi.mocked(getCatalog).mockReturnValue(new Promise(() => {}));
 		renderCatalog();
-		expect(screen.getByRole("status").textContent).toBe("Loading examples…");
+		expect(screen.getByRole("status")).toHaveTextContent("Loading examples…");
 	});
 	it("shows an actionable error and recovers on retry", async () => {
 		vi.mocked(getCatalog)
 			.mockRejectedValueOnce(new Error("Private backend details"))
 			.mockResolvedValueOnce(items);
 		renderCatalog();
-		expect((await screen.findByRole("alert")).textContent).not.toContain(
+		expect(await screen.findByRole("alert")).not.toHaveTextContent(
 			"Private backend details",
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+		await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 		expect(
 			await screen.findByRole("heading", { name: "Example item" }),
-		).toBeTruthy();
+		).toBeVisible();
 	});
 	it("keeps loaded results visible when a refresh fails", async () => {
 		vi.mocked(getCatalog)
@@ -53,10 +52,10 @@ describe("catalog query states", () => {
 			.mockRejectedValueOnce(new Error("Offline"));
 		renderCatalog();
 		await screen.findByRole("heading", { name: "Example item" });
-		fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-		expect((await screen.findByRole("alert")).textContent).toContain(
+		await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent(
 			"Showing the last loaded examples",
 		);
-		expect(screen.getByRole("heading", { name: "Example item" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Example item" })).toBeVisible();
 	});
 });
